@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">KTHD</string>
+    <string name="action_settings">Settings</string>
+    <!-- Strings used for fragments for navigation -->
+    <string name="home_fragment_label">Home</string>
+    <string name="create_task_fragment_label">Create Task</string>
+    <string name="focused_task_label">Focused Task</string>
+    <string name="usage_access_required_title">Usage Access Required</string>
+    <string name="usage_access_required_description">This app needs Usage Access to help you track your time effectively. Please grant this permission in the system settings.</string>
+    <string name="grant_permission_button">Grant Permission</string>
+    <string name="lorem_ipsum">Lorem ipsum dolor sit amet</string>
+    <string name="lorem_ipsum_long">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</string>
+    <string name="description_label">Description</string>
+    <string name="info_label">Info</string>
+    <string name="android_id_label">Participant ID: %1$s</string>
+    <string name="copy_android_id_label">Copy Participant ID</string>
+    <string name="copied_to_clipboard">Participant ID copied to clipboard</string>
+    <string name="consent_title">Informed Consent Form</string>
+    <string name="consent_body">Welcome to KTHD. Before using this application, please review and accept our consent agreement.\n\nThis application collects background usage metrics and active task durations to assist in tracking productivity and focus. Your data is associated with your unique Participant ID and stored securely.\n\nParticipation is completely voluntary. You may withdraw consent at any time by uninstalling the application.\n\nBy tapping \"Agree &amp; Continue\", you confirm that you have read and agreed to the terms of this study.</string>
+    <string name="consent_agree_button">Agree &amp; Continue</string>
+    <string name="consent_decline_button">Decline &amp; Exit</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+</resources>
