@@ -1,7 +1,6 @@
 package com.tealamore.kthd
 
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
@@ -49,18 +48,9 @@ class MainActivity : AppCompatActivity() {
                 return@addOnDestinationChangedListener
             }
             if (destination.id == R.id.ConsentFragment) {
-                binding.fab.hide()
                 supportActionBar?.setDisplayHomeAsUpEnabled(false)
-            } else {
-                binding.fab.show()
             }
             invalidateOptionsMenu()
-        }
-
-        binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null)
-                .setAnchorView(R.id.fab).show()
         }
     }
 
