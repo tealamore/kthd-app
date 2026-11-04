@@ -38,7 +38,11 @@ class PermissionFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         if (hasUsageAccess(requireContext())) {
-            findNavController().navigateUp()
+            try {
+                findNavController().navigateUp()
+            } catch (_: Exception) {
+                // NavController not set in standalone test container
+            }
         }
     }
 

@@ -15,6 +15,7 @@ import com.tealamore.kthd.databinding.FragmentActiveTaskBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 class ActiveTaskFragment : Fragment() {
 
@@ -74,7 +75,7 @@ class ActiveTaskFragment : Fragment() {
                     val minutes = (totalSeconds / 60) % 60
                     val hours = totalSeconds / 3600
                     binding.textActiveTaskTimer.text = String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
-                    delay(1000L)
+                    delay(1000L.milliseconds)
                 }
             }
         }
