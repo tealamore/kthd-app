@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class TaskForegroundService : Service() {
@@ -203,9 +204,76 @@ class TaskForegroundService : Service() {
                     showThresholdNotification(appName)
                 }
                 dao.update(payload.copy(id = payloadId, syncStatus = SyncStatus.SYNCED))
+                startRewardMonitoring(
+                    targetPackage = pkg,
+                    contextId = payloadId,
+                    taskId = currentTaskId,
+                    deviceId = deviceId
+                )
             } catch (e: Exception) {
                 Log.e("TaskForegroundService", "Failed to send context", e)
                 dao.update(payload.copy(id = payloadId, syncStatus = SyncStatus.FAILED))
+            }
+        }
+    }
+
+    private fun startRewardMonitoring(
+        targetPackage: String,
+        contextId: Long,
+        taskId: Long,
+        deviceId: String
+    ) {
+        serviceScope.launch {
+            val startTime = System.currentTimeMillis()
+            val observationDurationMs = 5 * 60 * 1000L // 5 minutes
+            val pollIntervalMs = 1000L
+
+            var screenLockedEver = false
+            var appClosedEver = false
+            var timeToCloseSec = 300
+
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+            val keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+
+            while (System.currentTimeMillis() - startTime < observationDurationMs) {
+                val now = System.currentTimeMillis()
+
+                val isScreenOff = !powerManager.isInteractive
+                val isLocked = keyguardManager.isDeviceLocked
+
+                val state = RewardEvaluator.evaluate(
+                    targetPackage = targetPackage,
+                    currentForegroundPackage = currentForegroundPackage,
+                    isScreenOff = isScreenOff,
+                    isLocked = isLocked,
+                    startTimeMs = startTime,
+                    nowMs = now,
+                    previousScreenLockedEver = screenLockedEver,
+                    previousAppClosedEver = appClosedEver,
+                    previousTimeToCloseSec = timeToCloseSec
+                )
+
+                screenLockedEver = state.screenLocked
+                appClosedEver = state.appClosed
+                timeToCloseSec = state.timeToCloseSec
+
+                delay(pollIntervalMs.milliseconds)
+            }
+
+            val rewardPayload = com.tealamore.kthd.network.RewardPayload(
+                deviceId = deviceId,
+                contextId = contextId,
+                taskId = taskId,
+                screenLocked = screenLockedEver,
+                appClosed = appClosedEver,
+                timeToClose = timeToCloseSec
+            )
+
+            try {
+                ApiClient.service.sendReward(rewardPayload)
+                Log.d("TaskForegroundService", "Reward payload successfully sent: $rewardPayload")
+            } catch (e: Exception) {
+                Log.e("TaskForegroundService", "Failed to send reward payload", e)
             }
         }
     }

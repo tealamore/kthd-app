@@ -15,3 +15,16 @@ data class ConsentPayload(
 data class ConsentResponse(
     @SerializedName("success") val success: Boolean = true
 )
+
+data class RewardPayload(
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("context_id") val contextId: Long,
+    @SerializedName("task_id") val taskId: Long,
+    @SerializedName("screen_locked") val screenLocked: Boolean,
+    @SerializedName("app_closed") val appClosed: Boolean,
+    @SerializedName("time_to_close") val timeToClose: Int
+)
+
+data class RewardResponse(
+    @SerializedName("success") val success: Boolean = true
+)

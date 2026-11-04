@@ -17,6 +17,9 @@ interface TaskApiService {
 
     @POST("consent")
     suspend fun sendConsent(@Body payload: ConsentPayload): ConsentResponse
+
+    @POST("reward")
+    suspend fun sendReward(@Body payload: RewardPayload): RewardResponse
 }
 
 object ApiClient {
