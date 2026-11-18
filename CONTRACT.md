@@ -23,6 +23,18 @@ All HTTP requests sent by the mobile app automatically include the following HTT
 | `/consent` | `POST` | Record participant informed consent agreement | `ConsentPayload` | `ConsentResponse` |
 | `/reward` | `POST` | Report reward observation data 5 minutes after intervention opportunity | `RewardPayload` | `RewardResponse` |
 | `/participant/delete` | `POST` | Request deletion of all backend data for a participant ID | `DeleteParticipantPayload` | `DeleteParticipantResponse` |
+| `/error` | `POST` | Report a non-2xx response the app received, so developers can be alerted | `ErrorReportPayload` | `ErrorReportResponse` |
+
+---
+
+## Delivery & Retry Semantics
+
+The app persists every request in a local queue before sending it, so requests survive being offline and the app being closed.
+
+* **Order**: requests are sent strictly in the order they were created. A request is never sent before an older one (e.g. a `/reward` is never sent before its `/context`; a new `/consent` is never sent before a pending `/participant/delete`).
+* **Retried**: network failures, timeouts, `5xx`, `408` and `429`. Retried with exponential backoff, in the background, until accepted. While the oldest request is being retried, newer requests wait behind it.
+* **Not retried**: any other non-`2xx` response (e.g. `400`). The request is dropped and reported to `/error`.
+* **Duplicates**: the app never sends a request again once it has received a `2xx` for it. A request whose response was lost (e.g. a timeout after the server processed it) is retried, so endpoints should tolerate an occasional duplicate.
 
 ---
 
@@ -178,7 +190,7 @@ Triggered automatically 5 minutes (300 seconds) after receiving a successful res
 
 ### 4. Delete Participant Data
 
-Triggered when the participant confirms data deletion from the Settings screen.
+Triggered when the participant confirms data deletion from the Settings screen. At the same time the app withdraws consent, stops data collection, cancels any requests still queued, and erases study data on the device. No further data is sent for this device until a new `/consent` (which is always sent after the deletion request).
 
 * **HTTP Verb**: `POST`
 * **Path**: `/participant/delete`
@@ -213,3 +225,61 @@ Triggered when the participant confirms data deletion from the Settings screen.
 | `200 OK` | Success | Participant data deletion request processed. |
 | `400 Bad Request` | Client Error | Missing or invalid `device_id`. |
 | `500 Internal Server Error` | Server Error | Backend failure during data deletion. |
+
+---
+
+### 5. Report Error
+
+Sent automatically when another request receives a non-`2xx` response:
+
+* every non-retryable response (e.g. `4xx`): the original request is dropped;
+* the first retryable response (`5xx`, `408`, `429`) for a given request; later retries of the same request are not reported again.
+
+Network failures and timeouts have no response and are not reported. Failures of `/error` itself are never reported. Error reports are queued and retried like any other request.
+
+* **HTTP Verb**: `POST`
+* **Path**: `/error`
+
+#### Request Body (`application/json`)
+```json
+{
+  "device_id": "8f3a21b4c5e67890",
+  "request_type": "REWARD",
+  "http_status": 400,
+  "error_type": "HttpException",
+  "error_message": "HTTP 400 Bad Request",
+  "response_body": "{\"error\": \"context_id not found\"}",
+  "request_body": "{\"device_id\":\"8f3a21b4c5e67890\",\"context_id\":42,...}",
+  "attempts": 1,
+  "will_retry": false,
+  "occurred_at_utc": "2026-11-18T15:00:00Z"
+}
+```
+
+#### Request Schema
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `device_id` | `string` | Yes | Unique Participant Android ID |
+| `request_type` | `string` | Yes | One of `CONSENT`, `CONTEXT`, `REWARD`, `DELETE_PARTICIPANT` |
+| `http_status` | `integer` | No | HTTP status code received (`null` if the failure was not an HTTP response, e.g. an unparseable body) |
+| `error_type` | `string` | Yes | Client-side exception class name |
+| `error_message` | `string` | No | Client-side exception message |
+| `response_body` | `string` | No | Response body received, truncated to 2000 characters |
+| `request_body` | `string` | Yes | JSON body of the failed request |
+| `attempts` | `integer` | Yes | Number of times the request has been attempted, including this one |
+| `will_retry` | `boolean` | Yes | Whether the app will retry the original request |
+| `occurred_at_utc` | `string` | Yes | ISO-8601 UTC timestamp of the failure |
+
+#### Response Body (`200 OK`)
+```json
+{
+  "success": true
+}
+```
+
+#### HTTP Status Codes
+| Code | Reason | Description |
+| :--- | :--- | :--- |
+| `200 OK` | Success | Error report recorded. |
+| `400 Bad Request` | Client Error | Malformed error report (dropped by the app, not retried). |
+| `500 Internal Server Error` | Server Error | Backend failure; the app retries. |

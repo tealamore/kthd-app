@@ -4,5 +4,6 @@ enum class RequestType {
     CONSENT,
     CONTEXT,
     REWARD,
-    DELETE_PARTICIPANT
+    DELETE_PARTICIPANT,
+    ERROR_REPORT
 }

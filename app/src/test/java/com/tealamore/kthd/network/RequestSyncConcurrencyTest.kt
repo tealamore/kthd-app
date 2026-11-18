@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.tealamore.kthd.data.AppDatabase
-import com.tealamore.kthd.data.ContextPayload
 import com.tealamore.kthd.data.PendingRequest
 import com.tealamore.kthd.data.RequestType
 import com.tealamore.kthd.data.SyncStatus
@@ -136,24 +135,10 @@ class RequestSyncConcurrencyTest {
                 row.syncStatus
             )
         }
+        assertEquals("The same queued consent request was POSTed more than once", 1, consentCalls.get())
     }
 
     companion object {
         private const val OVERLAP_WINDOW_MS = 500L
     }
-}
-
-/** Base fake: every endpoint fails unless a test overrides it. */
-open class FakeTaskApiService : TaskApiService {
-    override suspend fun sendContext(payload: ContextPayload): ContextResponse =
-        throw UnsupportedOperationException("sendContext not stubbed")
-
-    override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse =
-        throw UnsupportedOperationException("sendConsent not stubbed")
-
-    override suspend fun sendReward(payload: RewardPayload): RewardResponse =
-        throw UnsupportedOperationException("sendReward not stubbed")
-
-    override suspend fun deleteParticipantData(payload: DeleteParticipantPayload): DeleteParticipantResponse =
-        throw UnsupportedOperationException("deleteParticipantData not stubbed")
 }

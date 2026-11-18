@@ -15,11 +15,11 @@
     <string name="android_id_label">Participant ID: %1$s</string>
     <string name="delete_data_button_label">Delete My Data</string>
     <string name="delete_data_dialog_title">Delete Participant Data?</string>
-    <string name="delete_data_dialog_message">Are you sure you want to delete all your data associated with this Participant ID? This action cannot be undone.</string>
+    <string name="delete_data_dialog_message">Are you sure you want to delete all your data associated with this Participant ID? This withdraws your consent, stops data collection, and erases study data on this device and on our servers. You will need to consent again to keep using the app. This action cannot be undone.</string>
     <string name="delete_data_confirm_button">Delete</string>
     <string name="delete_data_cancel_button">Cancel</string>
-    <string name="delete_data_submitted_toast">Data deletion request submitted.</string>
-    <string name="delete_data_failed_toast">Failed to send deletion request. Please try again.</string>
+    <string name="delete_data_submitted_toast">Your data was deleted from this device and a deletion request was sent.</string>
+    <string name="delete_data_failed_toast">Failed to delete your data. Please try again.</string>
     <string name="consent_title">Informed Consent Form</string>
     <string name="consent_body">Welcome to KTHD. Before using this application, please review and accept our consent agreement.\n\nThis application collects background usage metrics and active task durations to assist in tracking productivity and focus. Your data is associated with your unique Participant ID and stored securely.\n\nParticipation is completely voluntary. You may withdraw consent at any time by uninstalling the application.\n\nBy tapping \"Agree &amp; Continue\", you confirm that you have read and agreed to the terms of this study.</string>
     <string name="consent_agree_button">Agree &amp; Continue</string>

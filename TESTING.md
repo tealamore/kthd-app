@@ -24,6 +24,8 @@ This document outlines the testing policy, architecture guidelines, and test exe
   - `TaskLifecycleIntegrationTest`: Full task lifecycle (`insert` -> `getActiveTaskFlow` -> `update` to COMPLETED -> `getCompletedTasks`).
   - `ContextSyncIntegrationTest`: Usage context payload logging in Room -> pending sync state -> updating sync status.
   - `ConsentNavigationIntegrationTest`: Consent state persistence -> Device ID retrieval -> Navigation guard behavior.
+  - `OfflineConsentIntegrationTest`: Consent queued while offline -> persisted in Room -> sent and marked SYNCED once back online.
+  - `ParticipantDataDeletionIntegrationTest`: "Delete My Data" -> consent withdrawn, collection stopped, local data and queued requests wiped -> deletion sent before any re-consent.
 
 ### 3. Continuous Integration (`.github/workflows/android_tests.yml`)
 * **Automated Workflow**: Executes `./gradlew app:testDebugUnitTest` on every push and pull request.

@@ -25,4 +25,7 @@ interface ContextPayloadDao {
 
     @Query("DELETE FROM context_payloads WHERE sync_status = 'SYNCED'")
     suspend fun deleteSyncedPayloads()
+
+    @Query("DELETE FROM context_payloads")
+    suspend fun deleteAll()
 }

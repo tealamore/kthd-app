@@ -23,6 +23,9 @@ interface TaskApiService {
 
     @POST("participant/delete")
     suspend fun deleteParticipantData(@Body payload: DeleteParticipantPayload): DeleteParticipantResponse
+
+    @POST("error")
+    suspend fun reportError(@Body payload: ErrorReportPayload): ErrorReportResponse
 }
 
 object ApiClient {

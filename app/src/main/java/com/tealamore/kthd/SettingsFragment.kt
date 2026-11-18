@@ -11,12 +11,13 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.tealamore.kthd.databinding.FragmentSettingsBinding
 import com.tealamore.kthd.network.ApiClient
-import com.tealamore.kthd.network.DeleteParticipantPayload
-import com.tealamore.kthd.network.RequestSyncManager
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsFragment : Fragment() {
 
@@ -45,7 +46,7 @@ class SettingsFragment : Fragment() {
                 .setMessage(R.string.delete_data_dialog_message)
                 .setPositiveButton(R.string.delete_data_confirm_button) { dialog, _ ->
                     dialog.dismiss()
-                    sendDataDeletionRequest(androidId)
+                    deleteParticipantData()
                 }
                 .setNegativeButton(R.string.delete_data_cancel_button) { dialog, _ ->
                     dialog.dismiss()
@@ -69,15 +70,22 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun sendDataDeletionRequest(deviceId: String) {
+    private fun deleteParticipantData() {
+        val appContext = requireContext().applicationContext
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                RequestSyncManager.enqueueDeleteParticipant(requireContext(), DeleteParticipantPayload(deviceId = deviceId))
-                Toast.makeText(requireContext(), R.string.delete_data_submitted_toast, Toast.LENGTH_SHORT).show()
+                // Must not be half-done if the user navigates away mid-way.
+                withContext(NonCancellable) { ParticipantDataDeletion.deleteAllData(appContext) }
             } catch (e: Exception) {
-                Log.e("SettingsFragment", "Failed to enqueue data deletion request", e)
-                Toast.makeText(requireContext(), R.string.delete_data_failed_toast, Toast.LENGTH_SHORT).show()
+                Log.e("SettingsFragment", "Failed to delete participant data", e)
+                Toast.makeText(appContext, R.string.delete_data_failed_toast, Toast.LENGTH_SHORT).show()
+                return@launch
             }
+            Toast.makeText(appContext, R.string.delete_data_submitted_toast, Toast.LENGTH_SHORT).show()
+            requireActivity().invalidateOptionsMenu()
+            // Back to the consent screen with an empty back stack: the app can't be used until
+            // the participant consents again.
+            findNavController().navigate(R.id.action_SettingsFragment_to_ConsentFragment)
         }
     }
 

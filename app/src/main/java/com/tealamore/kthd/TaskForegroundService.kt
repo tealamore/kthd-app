@@ -40,6 +40,26 @@ class TaskForegroundService : Service() {
     private var currentTaskId: Long = -1
     private var appSwitchCount = 0
 
+    // Reward monitoring starts only once the backend has responded to the context request.
+    private val contextResponseHandler = ContextResponseHandler(
+        showNotification = { pending -> showThresholdNotification(pending.appName) },
+        startRewardMonitoring = { pending ->
+            startRewardMonitoring(
+                targetPackage = pending.targetPackage,
+                contextId = pending.contextId,
+                taskId = pending.taskId,
+                deviceId = pending.deviceId
+            )
+        }
+    )
+
+    override fun onCreate() {
+        super.onCreate()
+        serviceScope.launch {
+            RequestSyncManager.contextResponses.collect { contextResponseHandler.onResponse(it) }
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         if (action == ACTION_STOP) {
@@ -63,6 +83,14 @@ class TaskForegroundService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
+        // Never collect data without consent (e.g. a sticky restart after the participant
+        // deleted their data). startForeground must still be called first to avoid a crash.
+        if (!ConsentManager.hasConsented(this)) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         if (pollingJob == null || pollingJob?.isCompleted == true) {
             startPolling(taskLabel)
         }
@@ -74,6 +102,7 @@ class TaskForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        contextResponseHandler.clear()
         serviceJob.cancel()
     }
 
@@ -184,6 +213,8 @@ class TaskForegroundService : Service() {
         Log.d("TaskForegroundService", "${THRESHOLD_DURATION/60}-minute threshold hit for $appName ($pkg)")
         
         serviceScope.launch {
+            if (!ConsentManager.hasConsented(applicationContext)) return@launch
+
             ApiClient.init(applicationContext)
             val deviceId = ApiClient.getDeviceId(applicationContext)
             val payload = ContextPayload(
@@ -198,13 +229,17 @@ class TaskForegroundService : Service() {
             val dao = db.contextPayloadDao()
             val payloadId = dao.insert(payload)
             
-            RequestSyncManager.enqueueContext(applicationContext, payload.copy(id = payloadId))
-            startRewardMonitoring(
-                targetPackage = pkg,
-                contextId = payloadId,
-                taskId = currentTaskId,
-                deviceId = deviceId
+            contextResponseHandler.register(
+                ContextResponseHandler.PendingContext(
+                    contextId = payloadId,
+                    taskId = currentTaskId,
+                    targetPackage = pkg,
+                    appName = appName,
+                    deviceId = deviceId
+                )
             )
+            val requestId = RequestSyncManager.enqueueContext(applicationContext, payload.copy(id = payloadId))
+            if (requestId < 0) contextResponseHandler.unregister(payloadId)
         }
     }
 
@@ -265,7 +300,32 @@ class TaskForegroundService : Service() {
     }
 
     private fun showThresholdNotification(appName: String) {
-        RequestSyncManager.showThresholdNotification(this, appName)
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        createAlertChannel()
+
+        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+            .setContentTitle("Threshold Alert")
+            .setContentText("1-minute threshold hit for $appName")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(ALERT_NOTIFICATION_ID, notification)
+    }
+
+    private fun createAlertChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                ALERT_CHANNEL_ID,
+                "Threshold Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Shows alerts when app usage thresholds are hit"
+            }
+            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
     }
 
     private fun updateNotification(taskLabel: String, foregroundPackage: String, durationSec: Long? = null) {
@@ -316,7 +376,9 @@ class TaskForegroundService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 1001
+        private const val ALERT_NOTIFICATION_ID = 1002
         private const val CHANNEL_ID = "active_task_channel"
+        private const val ALERT_CHANNEL_ID = "threshold_alert_channel"
         private const val EXTRA_TASK_LABEL = "extra_task_label"
         private const val EXTRA_TASK_ID = "extra_task_id"
         private const val ACTION_STOP = "action_stop"

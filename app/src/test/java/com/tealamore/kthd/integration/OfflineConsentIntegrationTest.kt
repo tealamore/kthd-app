@@ -10,13 +10,8 @@ import com.tealamore.kthd.data.SyncStatus
 import com.tealamore.kthd.network.ApiClient
 import com.tealamore.kthd.network.ConsentPayload
 import com.tealamore.kthd.network.ConsentResponse
-import com.tealamore.kthd.network.ContextResponse
-import com.tealamore.kthd.network.DeleteParticipantPayload
-import com.tealamore.kthd.network.DeleteParticipantResponse
+import com.tealamore.kthd.network.FakeTaskApiService
 import com.tealamore.kthd.network.RequestSyncManager
-import com.tealamore.kthd.network.RewardPayload
-import com.tealamore.kthd.network.RewardResponse
-import com.tealamore.kthd.network.TaskApiService
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -69,18 +64,15 @@ class OfflineConsentIntegrationTest {
 
         // Offline network service that throws IOException
         var attemptsMade = 0
-        val offlineService = object : TaskApiService {
-            override suspend fun sendContext(payload: com.tealamore.kthd.data.ContextPayload): ContextResponse = throw UnsupportedOperationException()
+        val offlineService = object : FakeTaskApiService() {
             override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
                 attemptsMade++
                 throw IOException("No internet connection")
             }
-            override suspend fun sendReward(payload: RewardPayload): RewardResponse = throw UnsupportedOperationException()
-            override suspend fun deleteParticipantData(payload: DeleteParticipantPayload): DeleteParticipantResponse = throw UnsupportedOperationException()
         }
 
         // Enqueue consent request while offline
-        RequestSyncManager.enqueueConsent(context, consentPayload, db = db)
+        RequestSyncManager.enqueueConsent(context, consentPayload, db = db, triggerSync = false)
         RequestSyncManager.processPendingRequests(context, baseDelayMs = 100L, apiService = offlineService, targetDb = db)
 
         assertEquals(1, attemptsMade)
@@ -97,14 +89,11 @@ class OfflineConsentIntegrationTest {
         // Step 3: User kills the app and reopens it. Network connection is restored.
         // Online network service succeeds
         var onlineCallsMade = 0
-        val onlineService = object : TaskApiService {
-            override suspend fun sendContext(payload: com.tealamore.kthd.data.ContextPayload): ContextResponse = throw UnsupportedOperationException()
+        val onlineService = object : FakeTaskApiService() {
             override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
                 onlineCallsMade++
                 return ConsentResponse(success = true)
             }
-            override suspend fun sendReward(payload: RewardPayload): RewardResponse = throw UnsupportedOperationException()
-            override suspend fun deleteParticipantData(payload: DeleteParticipantPayload): DeleteParticipantResponse = throw UnsupportedOperationException()
         }
 
         // App reopens: processPendingRequests is triggered (e.g. from MainActivity / RequestSyncManager)
