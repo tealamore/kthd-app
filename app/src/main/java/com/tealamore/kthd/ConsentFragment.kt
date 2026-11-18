@@ -2,7 +2,6 @@ package com.tealamore.kthd
 
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +12,7 @@ import androidx.navigation.fragment.findNavController
 import com.tealamore.kthd.databinding.FragmentConsentBinding
 import com.tealamore.kthd.network.ApiClient
 import com.tealamore.kthd.network.ConsentPayload
+import com.tealamore.kthd.network.RequestSyncManager
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -59,20 +59,15 @@ class ConsentFragment : Fragment() {
                 sdf.format(Date())
             }
 
-            viewLifecycleOwner.lifecycleScope.launch {
-                try {
-                    ApiClient.service.sendConsent(
-                        ConsentPayload(
-                            deviceId = deviceId,
-                            consented = true,
-                            consentTimeUtc = utcTime
-                        )
-                    )
-                } catch (e: Exception) {
-                    Log.e("ConsentFragment", "Failed to send consent to backend", e)
-                }
+            val payload = ConsentPayload(
+                deviceId = deviceId,
+                consented = true,
+                consentTimeUtc = utcTime
+            )
 
+            viewLifecycleOwner.lifecycleScope.launch {
                 ConsentManager.setConsented(requireContext(), true)
+                RequestSyncManager.enqueueConsent(requireContext(), payload)
                 requireActivity().invalidateOptionsMenu()
                 findNavController().navigate(R.id.action_ConsentFragment_to_HomeFragment)
             }

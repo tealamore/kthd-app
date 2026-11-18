@@ -1,0 +1,28 @@
+package com.tealamore.kthd.data
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface PendingRequestDao {
+    @Insert
+    suspend fun insert(request: PendingRequest): Long
+
+    @Update
+    suspend fun update(request: PendingRequest)
+
+    @Query("SELECT * FROM pending_requests WHERE sync_status = 'PENDING' OR sync_status = 'FAILED' ORDER BY id ASC")
+    suspend fun getUnsyncedRequests(): List<PendingRequest>
+
+    @Query("SELECT * FROM pending_requests ORDER BY created_at DESC")
+    suspend fun getAllRequests(): List<PendingRequest>
+
+    @Query("SELECT * FROM pending_requests ORDER BY created_at DESC")
+    fun getAllRequestsFlow(): Flow<List<PendingRequest>>
+
+    @Query("DELETE FROM pending_requests WHERE sync_status = 'SYNCED'")
+    suspend fun deleteSyncedRequests()
+}

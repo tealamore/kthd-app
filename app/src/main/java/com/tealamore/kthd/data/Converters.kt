@@ -22,4 +22,14 @@ class Converters {
     fun toSyncStatus(value: String): SyncStatus {
         return SyncStatus.valueOf(value)
     }
+
+    @TypeConverter
+    fun fromRequestType(type: RequestType): String {
+        return type.name
+    }
+
+    @TypeConverter
+    fun toRequestType(value: String): RequestType {
+        return RequestType.valueOf(value)
+    }
 }

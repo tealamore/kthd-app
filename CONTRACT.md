@@ -22,6 +22,7 @@ All HTTP requests sent by the mobile app automatically include the following HTT
 | `/context` | `POST` | Log app usage threshold events during an active task | `ContextPayload` | `ContextResponse` |
 | `/consent` | `POST` | Record participant informed consent agreement | `ConsentPayload` | `ConsentResponse` |
 | `/reward` | `POST` | Report reward observation data 5 minutes after intervention opportunity | `RewardPayload` | `RewardResponse` |
+| `/participant/delete` | `POST` | Request deletion of all backend data for a participant ID | `DeleteParticipantPayload` | `DeleteParticipantResponse` |
 
 ---
 
@@ -172,3 +173,43 @@ Triggered automatically 5 minutes (300 seconds) after receiving a successful res
 | `200 OK` | Success | Reward observation recorded successfully. |
 | `400 Bad Request` | Client Error | Missing or invalid reward fields. |
 | `500 Internal Server Error` | Server Error | Server error processing reward observation. |
+
+---
+
+### 4. Delete Participant Data
+
+Triggered when the participant confirms data deletion from the Settings screen.
+
+* **HTTP Verb**: `POST`
+* **Path**: `/participant/delete`
+
+#### Request Body (`application/json`)
+```json
+{
+  "device_id": "8f3a21b4c5e67890"
+}
+```
+
+#### Request Schema
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `device_id` | `string` | Yes | Unique Participant Android ID to delete |
+
+#### Response Body (`200 OK`)
+```json
+{
+  "success": true
+}
+```
+
+#### Response Schema
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `success` | `boolean` | Indicates successful processing of data deletion request. |
+
+#### HTTP Status Codes
+| Code | Reason | Description |
+| :--- | :--- | :--- |
+| `200 OK` | Success | Participant data deletion request processed. |
+| `400 Bad Request` | Client Error | Missing or invalid `device_id`. |
+| `500 Internal Server Error` | Server Error | Backend failure during data deletion. |

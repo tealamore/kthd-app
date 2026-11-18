@@ -28,3 +28,11 @@ data class RewardPayload(
 data class RewardResponse(
     @SerializedName("success") val success: Boolean = true
 )
+
+data class DeleteParticipantPayload(
+    @SerializedName("device_id") val deviceId: String
+)
+
+data class DeleteParticipantResponse(
+    @SerializedName("success") val success: Boolean = true
+)

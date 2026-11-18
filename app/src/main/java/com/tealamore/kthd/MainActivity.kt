@@ -14,6 +14,7 @@ import android.view.Menu
 import android.view.MenuItem
 import com.tealamore.kthd.databinding.ActivityMainBinding
 import com.tealamore.kthd.network.ApiClient
+import com.tealamore.kthd.network.RequestSyncManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ApiClient.init(applicationContext)
+        RequestSyncManager.startSync(applicationContext)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)

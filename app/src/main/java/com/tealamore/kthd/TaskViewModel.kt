@@ -14,12 +14,14 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val taskDao: TaskDao = db.taskDao()
     private val payloadDao = db.contextPayloadDao()
+    private val pendingRequestDao = db.pendingRequestDao()
 
     val activeTask: Flow<Task?> = taskDao.getActiveTaskFlow()
     val completedTasks: Flow<List<Task>> = taskDao.getCompletedTasks()
     
     fun getAllTasks() = taskDao.getAllTasks()
     fun getAllPayloads() = payloadDao.getAllPayloadsFlow()
+    fun getAllPendingRequests() = pendingRequestDao.getAllRequestsFlow()
 
     suspend fun hasActiveTask(): Boolean {
         return taskDao.getActiveTask() != null

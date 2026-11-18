@@ -20,6 +20,9 @@ interface TaskApiService {
 
     @POST("reward")
     suspend fun sendReward(@Body payload: RewardPayload): RewardResponse
+
+    @POST("participant/delete")
+    suspend fun deleteParticipantData(@Body payload: DeleteParticipantPayload): DeleteParticipantResponse
 }
 
 object ApiClient {

@@ -41,12 +41,14 @@
             tools:text="Android ID: 1234567890abcdef" />
 
         <Button
-            android:id="@+id/button_copy_android_id"
+            android:id="@+id/button_delete_participant_data"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="@string/copy_android_id_label" />
+            android:text="@string/delete_data_button_label"
+            android:textColor="?attr/colorError"
+            app:strokeColor="?attr/colorError" />
 
         <View
             android:layout_width="match_parent"

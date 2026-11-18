@@ -18,8 +18,8 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.tealamore.kthd.data.AppDatabase
 import com.tealamore.kthd.data.ContextPayload
-import com.tealamore.kthd.data.SyncStatus
 import com.tealamore.kthd.network.ApiClient
+import com.tealamore.kthd.network.RequestSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -198,22 +198,13 @@ class TaskForegroundService : Service() {
             val dao = db.contextPayloadDao()
             val payloadId = dao.insert(payload)
             
-            try {
-                val response = ApiClient.service.sendContext(payload)
-                if (response.notify) {
-                    showThresholdNotification(appName)
-                }
-                dao.update(payload.copy(id = payloadId, syncStatus = SyncStatus.SYNCED))
-                startRewardMonitoring(
-                    targetPackage = pkg,
-                    contextId = payloadId,
-                    taskId = currentTaskId,
-                    deviceId = deviceId
-                )
-            } catch (e: Exception) {
-                Log.e("TaskForegroundService", "Failed to send context", e)
-                dao.update(payload.copy(id = payloadId, syncStatus = SyncStatus.FAILED))
-            }
+            RequestSyncManager.enqueueContext(applicationContext, payload.copy(id = payloadId))
+            startRewardMonitoring(
+                targetPackage = pkg,
+                contextId = payloadId,
+                taskId = currentTaskId,
+                deviceId = deviceId
+            )
         }
     }
 
@@ -269,42 +260,12 @@ class TaskForegroundService : Service() {
                 timeToClose = timeToCloseSec
             )
 
-            try {
-                ApiClient.service.sendReward(rewardPayload)
-                Log.d("TaskForegroundService", "Reward payload successfully sent: $rewardPayload")
-            } catch (e: Exception) {
-                Log.e("TaskForegroundService", "Failed to send reward payload", e)
-            }
+            RequestSyncManager.enqueueReward(applicationContext, rewardPayload)
         }
     }
 
     private fun showThresholdNotification(appName: String) {
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        createAlertChannel()
-        
-        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
-            .setContentTitle("Threshold Alert")
-            .setContentText("1-minute threshold hit for $appName")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .build()
-            
-        notificationManager.notify(ALERT_NOTIFICATION_ID, notification)
-    }
-
-    private fun createAlertChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                ALERT_CHANNEL_ID,
-                "Threshold Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Shows alerts when app usage thresholds are hit"
-            }
-            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
-        }
+        RequestSyncManager.showThresholdNotification(this, appName)
     }
 
     private fun updateNotification(taskLabel: String, foregroundPackage: String, durationSec: Long? = null) {
@@ -355,9 +316,7 @@ class TaskForegroundService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 1001
-        private const val ALERT_NOTIFICATION_ID = 1002
         private const val CHANNEL_ID = "active_task_channel"
-        private const val ALERT_CHANNEL_ID = "threshold_alert_channel"
         private const val EXTRA_TASK_LABEL = "extra_task_label"
         private const val EXTRA_TASK_ID = "extra_task_id"
         private const val ACTION_STOP = "action_stop"

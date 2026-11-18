@@ -1,9 +1,7 @@
 package com.tealamore.kthd
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,8 +11,11 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.tealamore.kthd.databinding.FragmentSettingsBinding
 import com.tealamore.kthd.network.ApiClient
+import com.tealamore.kthd.network.DeleteParticipantPayload
+import com.tealamore.kthd.network.RequestSyncManager
 import kotlinx.coroutines.launch
 
 class SettingsFragment : Fragment() {
@@ -38,11 +39,18 @@ class SettingsFragment : Fragment() {
         val androidId = ApiClient.getDeviceId(requireContext())
         binding.textAndroidId.text = getString(R.string.android_id_label, androidId)
 
-        binding.buttonCopyAndroidId.setOnClickListener {
-            val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Participant ID", "Participant ID: $androidId")
-            clipboard.setPrimaryClip(clip)
-            Toast.makeText(requireContext(), R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
+        binding.buttonDeleteParticipantData.setOnClickListener {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.delete_data_dialog_title)
+                .setMessage(R.string.delete_data_dialog_message)
+                .setPositiveButton(R.string.delete_data_confirm_button) { dialog, _ ->
+                    dialog.dismiss()
+                    sendDataDeletionRequest(androidId)
+                }
+                .setNegativeButton(R.string.delete_data_cancel_button) { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .show()
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -57,6 +65,18 @@ class SettingsFragment : Fragment() {
                         binding.textPayloadsDump.text = payloads.joinToString("\n\n")
                     }
                 }
+            }
+        }
+    }
+
+    private fun sendDataDeletionRequest(deviceId: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                RequestSyncManager.enqueueDeleteParticipant(requireContext(), DeleteParticipantPayload(deviceId = deviceId))
+                Toast.makeText(requireContext(), R.string.delete_data_submitted_toast, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Log.e("SettingsFragment", "Failed to enqueue data deletion request", e)
+                Toast.makeText(requireContext(), R.string.delete_data_failed_toast, Toast.LENGTH_SHORT).show()
             }
         }
     }

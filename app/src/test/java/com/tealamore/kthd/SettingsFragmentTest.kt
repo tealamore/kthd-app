@@ -33,6 +33,12 @@ class SettingsFragmentTest {
     }
 
     @Test
+    fun testDeleteParticipantPayloadCreation() {
+        val payload = com.tealamore.kthd.network.DeleteParticipantPayload(deviceId = "participant_123")
+        org.junit.Assert.assertEquals("participant_123", payload.deviceId)
+    }
+
+    @Test
     fun testSettingsFragmentViewCreation() {
         val activityController = Robolectric.buildActivity(AppCompatActivity::class.java).setup()
         val activity = activityController.get()
