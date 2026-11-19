@@ -249,24 +249,34 @@ object RequestSyncManager {
     }
 
     private suspend fun send(request: PendingRequest, api: TaskApiService, database: AppDatabase) {
+        val key = request.idempotencyKey
         when (request.requestType) {
             RequestType.CONSENT ->
-                api.sendConsent(gson.fromJson(request.payloadJson, ConsentPayload::class.java))
+                api.sendConsent(gson.fromJson(request.payloadJson, ConsentPayload::class.java), key)
             RequestType.CONTEXT -> {
                 val payload = gson.fromJson(request.payloadJson, ContextPayload::class.java)
-                val response = api.sendContext(payload)
+                val response = api.sendContext(payload, key)
                 if (payload.id != 0L) {
                     database.contextPayloadDao().update(payload.copy(syncStatus = SyncStatus.SYNCED))
                 }
                 _contextResponses.emit(ContextResponseEvent(payload.id, payload.taskId, response.notify))
             }
             RequestType.REWARD ->
-                api.sendReward(gson.fromJson(request.payloadJson, RewardPayload::class.java))
+                api.sendReward(gson.fromJson(request.payloadJson, RewardPayload::class.java), key)
             RequestType.DELETE_PARTICIPANT ->
-                api.deleteParticipantData(gson.fromJson(request.payloadJson, DeleteParticipantPayload::class.java))
+                api.deleteParticipantData(gson.fromJson(request.payloadJson, DeleteParticipantPayload::class.java), key)
             RequestType.ERROR_REPORT ->
-                api.reportError(gson.fromJson(request.payloadJson, ErrorReportPayload::class.java))
+                api.reportError(gson.fromJson(request.payloadJson, ErrorReportPayload::class.java), key)
         }
+    }
+
+    /** The backend endpoint a request type is sent to, as reported in error reports. */
+    fun endpointFor(type: RequestType): String = when (type) {
+        RequestType.CONSENT -> "POST /consent"
+        RequestType.CONTEXT -> "POST /context"
+        RequestType.REWARD -> "POST /reward"
+        RequestType.DELETE_PARTICIPANT -> "POST /participant/delete"
+        RequestType.ERROR_REPORT -> "POST /error"
     }
 
     private suspend fun markContextRejected(request: PendingRequest, database: AppDatabase) {
@@ -298,6 +308,8 @@ object RequestSyncManager {
         val report = ErrorReportPayload(
             deviceId = ApiClient.getDeviceId(context),
             requestType = failed.requestType.name,
+            endpoint = endpointFor(failed.requestType),
+            idempotencyKey = failed.idempotencyKey,
             httpStatus = http?.code(),
             errorType = error.javaClass.simpleName,
             errorMessage = error.message,

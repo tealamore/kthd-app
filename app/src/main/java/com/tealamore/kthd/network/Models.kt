@@ -44,6 +44,8 @@ data class DeleteParticipantResponse(
 data class ErrorReportPayload(
     @SerializedName("device_id") val deviceId: String,
     @SerializedName("request_type") val requestType: String,
+    @SerializedName("endpoint") val endpoint: String,
+    @SerializedName("idempotency_key") val idempotencyKey: String,
     @SerializedName("http_status") val httpStatus: Int?,
     @SerializedName("error_type") val errorType: String,
     @SerializedName("error_message") val errorMessage: String?,

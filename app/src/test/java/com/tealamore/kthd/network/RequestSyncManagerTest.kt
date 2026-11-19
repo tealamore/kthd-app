@@ -104,7 +104,7 @@ class RequestSyncManagerTest {
 
         var calls = 0
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 calls++
                 return ConsentResponse(success = true)
             }
@@ -126,7 +126,7 @@ class RequestSyncManagerTest {
 
         var calls = 0
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 calls++
                 throw IOException("Network offline")
             }
@@ -169,7 +169,7 @@ class RequestSyncManagerTest {
     fun timeoutIsRetriedAndNotReported() = runBlocking {
         val id = enqueueConsent()
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse =
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse =
                 throw SocketTimeoutException("timeout")
         }
 
@@ -184,7 +184,7 @@ class RequestSyncManagerTest {
         val id = enqueueConsent()
         var calls = 0
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 calls++
                 throw httpError(503, """{"error":"maintenance"}""")
             }
@@ -213,7 +213,7 @@ class RequestSyncManagerTest {
         val goodId = enqueueConsent(consent("good"))
 
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 if (payload.deviceId == "bad") throw httpError(400, """{"error":"missing field"}""")
                 return ConsentResponse(success = true)
             }
@@ -243,8 +243,8 @@ class RequestSyncManagerTest {
         enqueueConsent()
         var reportCalls = 0
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse = throw httpError(400)
-            override suspend fun reportError(payload: ErrorReportPayload): ErrorReportResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse = throw httpError(400)
+            override suspend fun reportError(payload: ErrorReportPayload, idempotencyKey: String): ErrorReportResponse {
                 reportCalls++
                 throw httpError(400)
             }
@@ -269,12 +269,12 @@ class RequestSyncManagerTest {
         var contextUp = false
         val sent = mutableListOf<String>()
         val api = object : FakeTaskApiService() {
-            override suspend fun sendContext(payload: ContextPayload): ContextResponse {
+            override suspend fun sendContext(payload: ContextPayload, idempotencyKey: String): ContextResponse {
                 if (!contextUp) throw IOException("offline")
                 sent += "context"
                 return ContextResponse(notify = false)
             }
-            override suspend fun sendReward(payload: RewardPayload): RewardResponse {
+            override suspend fun sendReward(payload: RewardPayload, idempotencyKey: String): RewardResponse {
                 sent += "reward"
                 return RewardResponse()
             }
@@ -300,7 +300,7 @@ class RequestSyncManagerTest {
                 RequestSyncManager.contextResponses.first { it.contextId == ctx.id }
             }
             val api = object : FakeTaskApiService() {
-                override suspend fun sendContext(payload: ContextPayload) = ContextResponse(notify = notify)
+                override suspend fun sendContext(payload: ContextPayload, idempotencyKey: String) = ContextResponse(notify = notify)
             }
             process(api)
 
@@ -314,7 +314,7 @@ class RequestSyncManagerTest {
         val ctx = insertContext()
         RequestSyncManager.enqueueContext(context, ctx, db = db, triggerSync = false)
         val api = object : FakeTaskApiService() {
-            override suspend fun sendContext(payload: ContextPayload): ContextResponse = throw httpError(422)
+            override suspend fun sendContext(payload: ContextPayload, idempotencyKey: String): ContextResponse = throw httpError(422)
         }
 
         process(api)
@@ -343,7 +343,7 @@ class RequestSyncManagerTest {
     fun aRequestClearedWhileInFlightIsNotResurrectedOrReported() = runBlocking {
         val id = enqueueConsent()
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 dao.deleteAll() // participant deletes their data mid-request
                 throw httpError(400)
             }
@@ -354,5 +354,62 @@ class RequestSyncManagerTest {
         assertNull(dao.getById(id))
         assertTrue(dao.getAllRequests().isEmpty())
         assertTrue(api.errorReports.isEmpty())
+    }
+
+    // --- idempotency keys ----------------------------------------------------------------
+
+    @Test
+    fun retriesReuseTheIdempotencyKeyAndRequestsDoNotShareOne() = runBlocking {
+        enqueueConsent(consent("first"))
+        enqueueConsent(consent("second"))
+
+        val keysByDevice = mutableMapOf<String, MutableList<String>>()
+        var failFirst = true
+        val api = object : FakeTaskApiService() {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
+                keysByDevice.getOrPut(payload.deviceId) { mutableListOf() } += idempotencyKey
+                if (payload.deviceId == "first" && failFirst) {
+                    failFirst = false
+                    throw httpError(503)
+                }
+                return ConsentResponse()
+            }
+        }
+
+        process(api, baseDelayMs = 0L) // "first" fails with 503
+        process(api, baseDelayMs = 0L) // "first" retried, then "second"
+
+        val firstKeys = keysByDevice.getValue("first")
+        val secondKeys = keysByDevice.getValue("second")
+        assertEquals(2, firstKeys.size)
+        assertEquals("A retry must reuse the same key", firstKeys[0], firstKeys[1])
+        assertEquals(1, secondKeys.size)
+        assertTrue("Different requests must have different keys", firstKeys[0] != secondKeys[0])
+    }
+
+    @Test
+    fun errorReportsIdentifyTheFailedRequestAndHaveTheirOwnKey() = runBlocking {
+        val ctx = insertContext()
+        val requestId = RequestSyncManager.enqueueContext(context, ctx, db = db, triggerSync = false)
+        val failedKey = row(requestId).idempotencyKey
+
+        var reportKey: String? = null
+        val api = object : FakeTaskApiService() {
+            override suspend fun sendContext(payload: ContextPayload, idempotencyKey: String): ContextResponse =
+                throw httpError(400, """{"error":"bad app_type"}""")
+            override suspend fun reportError(payload: ErrorReportPayload, idempotencyKey: String): ErrorReportResponse {
+                reportKey = idempotencyKey
+                return super.reportError(payload, idempotencyKey)
+            }
+        }
+
+        process(api)
+
+        val report = api.errorReports.single()
+        assertEquals("POST /context", report.endpoint)
+        assertEquals("CONTEXT", report.requestType)
+        assertEquals(failedKey, report.idempotencyKey)
+        assertEquals("""{"error":"bad app_type"}""", report.responseBody)
+        assertTrue(reportKey != null && reportKey != failedKey)
     }
 }

@@ -82,7 +82,7 @@ class RequestSyncConcurrencyTest {
         val secondCallArrived = CompletableDeferred<Unit>()
 
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 if (consentCalls.incrementAndGet() == 1) {
                     // Keep the first request "on the wire" until the other pass also sends it.
                     withTimeoutOrNull(OVERLAP_WINDOW_MS) { secondCallArrived.await() }
@@ -111,7 +111,7 @@ class RequestSyncConcurrencyTest {
         val secondCallFinished = CompletableDeferred<Unit>()
 
         val api = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 if (consentCalls.incrementAndGet() == 1) {
                     // Slow request: still in flight while the other pass sends the same row
                     // successfully, then it times out.

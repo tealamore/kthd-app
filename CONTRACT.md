@@ -12,6 +12,7 @@ All HTTP requests sent by the mobile app automatically include the following HTT
 | :--- | :--- | :--- | :--- |
 | `Content-Type` | `string` | `application/json` | Standard JSON payload format |
 | `X-Device-ID` | `string` | `8f3a21b4c5e67890` | Participant's unique 64-bit Android ID |
+| `Idempotency-Key` | `string` | `3f1c9a7e-2b4d-4e8a-9c6f-0d5b7a1e2f34` | UUID generated once per request and reused on every retry of that request. See *Delivery & Retry Semantics*. |
 
 ---
 
@@ -34,7 +35,8 @@ The app persists every request in a local queue before sending it, so requests s
 * **Order**: requests are sent strictly in the order they were created. A request is never sent before an older one (e.g. a `/reward` is never sent before its `/context`; a new `/consent` is never sent before a pending `/participant/delete`).
 * **Retried**: network failures, timeouts, `5xx`, `408` and `429`. Retried with exponential backoff, in the background, until accepted. While the oldest request is being retried, newer requests wait behind it.
 * **Not retried**: any other non-`2xx` response (e.g. `400`). The request is dropped and reported to `/error`.
-* **Duplicates**: the app never sends a request again once it has received a `2xx` for it. A request whose response was lost (e.g. a timeout after the server processed it) is retried, so endpoints should tolerate an occasional duplicate.
+* **Deletion first**: a participant data deletion wipes every request still queued on the device, so `/participant/delete` is sent immediately and is never held up by older requests that are failing.
+* **Duplicates**: the app never sends a request again once it has received a `2xx` for it. A request whose response was lost (e.g. a timeout after the server processed it) is retried with the **same** `Idempotency-Key`. The backend should store processed keys and, when a key is seen again, return the original response (`2xx`) without processing the request a second time. Different requests never share a key.
 
 ---
 
@@ -245,6 +247,8 @@ Network failures and timeouts have no response and are not reported. Failures of
 {
   "device_id": "8f3a21b4c5e67890",
   "request_type": "REWARD",
+  "endpoint": "POST /reward",
+  "idempotency_key": "3f1c9a7e-2b4d-4e8a-9c6f-0d5b7a1e2f34",
   "http_status": 400,
   "error_type": "HttpException",
   "error_message": "HTTP 400 Bad Request",
@@ -261,6 +265,8 @@ Network failures and timeouts have no response and are not reported. Failures of
 | :--- | :--- | :--- | :--- |
 | `device_id` | `string` | Yes | Unique Participant Android ID |
 | `request_type` | `string` | Yes | One of `CONSENT`, `CONTEXT`, `REWARD`, `DELETE_PARTICIPANT` |
+| `endpoint` | `string` | Yes | HTTP verb and path of the failed request, e.g. `POST /reward` |
+| `idempotency_key` | `string` | Yes | `Idempotency-Key` of the failed request (the error report itself is sent with its own key) |
 | `http_status` | `integer` | No | HTTP status code received (`null` if the failure was not an HTTP response, e.g. an unparseable body) |
 | `error_type` | `string` | Yes | Client-side exception class name |
 | `error_message` | `string` | No | Client-side exception message |

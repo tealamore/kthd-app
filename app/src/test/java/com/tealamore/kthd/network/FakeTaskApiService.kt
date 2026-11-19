@@ -10,20 +10,20 @@ import retrofit2.Response
 open class FakeTaskApiService : TaskApiService {
     val errorReports = mutableListOf<ErrorReportPayload>()
 
-    override suspend fun sendContext(payload: ContextPayload): ContextResponse =
+    override suspend fun sendContext(payload: ContextPayload, idempotencyKey: String): ContextResponse =
         throw UnsupportedOperationException("sendContext not stubbed")
 
-    override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse =
+    override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse =
         throw UnsupportedOperationException("sendConsent not stubbed")
 
-    override suspend fun sendReward(payload: RewardPayload): RewardResponse =
+    override suspend fun sendReward(payload: RewardPayload, idempotencyKey: String): RewardResponse =
         throw UnsupportedOperationException("sendReward not stubbed")
 
-    override suspend fun deleteParticipantData(payload: DeleteParticipantPayload): DeleteParticipantResponse =
+    override suspend fun deleteParticipantData(payload: DeleteParticipantPayload, idempotencyKey: String): DeleteParticipantResponse =
         throw UnsupportedOperationException("deleteParticipantData not stubbed")
 
     /** Accepts error reports by default and records them. */
-    override suspend fun reportError(payload: ErrorReportPayload): ErrorReportResponse {
+    override suspend fun reportError(payload: ErrorReportPayload, idempotencyKey: String): ErrorReportResponse {
         errorReports += payload
         return ErrorReportResponse(success = true)
     }

@@ -115,12 +115,12 @@ class ParticipantDataDeletionIntegrationTest {
         var backendUp = false
         val calls = mutableListOf<String>()
         val api = object : FakeTaskApiService() {
-            override suspend fun deleteParticipantData(payload: DeleteParticipantPayload): DeleteParticipantResponse {
+            override suspend fun deleteParticipantData(payload: DeleteParticipantPayload, idempotencyKey: String): DeleteParticipantResponse {
                 if (!backendUp) throw IOException("offline")
                 calls += "delete"
                 return DeleteParticipantResponse()
             }
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 calls += "consent"
                 return ConsentResponse()
             }
@@ -133,5 +133,34 @@ class ParticipantDataDeletionIntegrationTest {
         RequestSyncManager.processPendingRequests(context, baseDelayMs = 0L, apiService = api, targetDb = db)
         assertEquals(listOf("delete", "consent"), calls)
         assertTrue(db.pendingRequestDao().getAllRequests().all { it.syncStatus == SyncStatus.SYNCED })
+    }
+
+    @Test
+    fun deletionIsNotHeldUpByARequestStuckRetrying() = runBlocking {
+        // A consent request is failing with 503 and backing off for a long time.
+        RequestSyncManager.enqueueConsent(
+            context, ConsentPayload("dev", true, "2026-11-18T12:00:00Z"), db = db, triggerSync = false
+        )
+        val calls = mutableListOf<String>()
+        val api = object : FakeTaskApiService() {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
+                calls += "consent"
+                throw com.tealamore.kthd.network.httpError(503)
+            }
+            override suspend fun deleteParticipantData(payload: DeleteParticipantPayload, idempotencyKey: String): DeleteParticipantResponse {
+                calls += "delete"
+                return DeleteParticipantResponse()
+            }
+        }
+        val longBackoff = 60_000L
+        RequestSyncManager.processPendingRequests(context, baseDelayMs = longBackoff, apiService = api, targetDb = db)
+
+        ParticipantDataDeletion.deleteAllData(context, db, triggerSync = false)
+
+        // The stuck request (and the error report it produced) were wiped, so the deletion is
+        // sent right away instead of waiting out the backoff.
+        RequestSyncManager.processPendingRequests(context, baseDelayMs = longBackoff, apiService = api, targetDb = db)
+        assertEquals(listOf("consent", "delete"), calls)
+        assertTrue(db.pendingRequestDao().getUnsyncedRequests().isEmpty())
     }
 }

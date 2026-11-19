@@ -65,7 +65,7 @@ class OfflineConsentIntegrationTest {
         // Offline network service that throws IOException
         var attemptsMade = 0
         val offlineService = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 attemptsMade++
                 throw IOException("No internet connection")
             }
@@ -90,7 +90,7 @@ class OfflineConsentIntegrationTest {
         // Online network service succeeds
         var onlineCallsMade = 0
         val onlineService = object : FakeTaskApiService() {
-            override suspend fun sendConsent(payload: ConsentPayload): ConsentResponse {
+            override suspend fun sendConsent(payload: ConsentPayload, idempotencyKey: String): ConsentResponse {
                 onlineCallsMade++
                 return ConsentResponse(success = true)
             }
