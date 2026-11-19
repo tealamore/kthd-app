@@ -9,6 +9,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -29,6 +30,12 @@ class RequestSyncWorkerTest {
             context,
             Configuration.Builder().setExecutor(SynchronousExecutor()).build()
         )
+    }
+
+    @After
+    fun tearDown() {
+        // Close the in-memory WorkDatabase created above so it isn't leaked between tests.
+        WorkManagerTestInitHelper.closeWorkDatabase()
     }
 
     @Test
