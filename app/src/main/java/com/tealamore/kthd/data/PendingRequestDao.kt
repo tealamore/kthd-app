@@ -4,7 +4,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PendingRequestDao {
@@ -26,9 +25,6 @@ interface PendingRequestDao {
 
     @Query("SELECT * FROM pending_requests ORDER BY created_at DESC")
     suspend fun getAllRequests(): List<PendingRequest>
-
-    @Query("SELECT * FROM pending_requests ORDER BY created_at DESC")
-    fun getAllRequestsFlow(): Flow<List<PendingRequest>>
 
     /** Removes finished (synced or rejected) requests created before [cutoffMs]. */
     @Query("DELETE FROM pending_requests WHERE (sync_status = 'SYNCED' OR sync_status = 'REJECTED') AND created_at < :cutoffMs")
