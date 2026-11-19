@@ -27,7 +27,7 @@
             android:layout_marginTop="8dp"
             android:layout_marginBottom="12dp"
             android:lineSpacingExtra="4dp"
-            android:text="@string/lorem_ipsum_long"
+            android:text="@string/unenroll_description"
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="14sp" />
 

@@ -9,7 +9,7 @@
     <string name="usage_access_required_description">This app needs Usage Access to help you track your time effectively. Please grant this permission in the system settings.</string>
     <string name="grant_permission_button">Grant Permission</string>
     <string name="lorem_ipsum">Lorem ipsum dolor sit amet</string>
-    <string name="lorem_ipsum_long">If you want to remove your information please click the button below to delete all the data you generated using the application. \n Note this action is final. Data cannot be restored. If you wish to resume participation in the study, you will have to consent again with none of your prior data saved. \n To delete the researchers\' copy of the information submitted via the Google Form at the start of the study or ending survey/interview data, contact the Teal Amore at tamore@emich.edu.</string>
+    <string name="unenroll_description">If you want to remove your information please click the button below to delete all the data you generated using the application.\nNote this action is final. Data cannot be restored. If you wish to resume participation in the study, you will have to consent again with none of your prior data saved.\nTo delete the researchers\' copy of the information submitted via the Google Form at the start of the study or ending survey/interview data, contact Teal Amore at tamore@emich.edu.</string>
     <string name="description_label">Description</string>
     <string name="info_label">Info</string>
     <string name="android_id_label">Participant ID: %1$s</string>
