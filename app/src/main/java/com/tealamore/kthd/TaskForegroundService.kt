@@ -18,8 +18,8 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.tealamore.kthd.data.AppDatabase
 import com.tealamore.kthd.data.ContextPayload
-import com.tealamore.kthd.data.SyncStatus
 import com.tealamore.kthd.network.ApiClient
+import com.tealamore.kthd.network.RequestSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,6 +39,26 @@ class TaskForegroundService : Service() {
     private var thresholdTriggered = false
     private var currentTaskId: Long = -1
     private var appSwitchCount = 0
+
+    // Reward monitoring starts only once the backend has responded to the context request.
+    private val contextResponseHandler = ContextResponseHandler(
+        showNotification = { pending -> showThresholdNotification(pending.appName) },
+        startRewardMonitoring = { pending ->
+            startRewardMonitoring(
+                targetPackage = pending.targetPackage,
+                contextId = pending.contextId,
+                taskId = pending.taskId,
+                deviceId = pending.deviceId
+            )
+        }
+    )
+
+    override fun onCreate() {
+        super.onCreate()
+        serviceScope.launch {
+            RequestSyncManager.contextResponses.collect { contextResponseHandler.onResponse(it) }
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
@@ -63,6 +83,14 @@ class TaskForegroundService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
+        // Never collect data without consent (e.g. a sticky restart after the participant
+        // deleted their data). startForeground must still be called first to avoid a crash.
+        if (!ConsentManager.hasConsented(this)) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         if (pollingJob == null || pollingJob?.isCompleted == true) {
             startPolling(taskLabel)
         }
@@ -74,6 +102,7 @@ class TaskForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        contextResponseHandler.clear()
         serviceJob.cancel()
     }
 
@@ -184,6 +213,8 @@ class TaskForegroundService : Service() {
         Log.d("TaskForegroundService", "${THRESHOLD_DURATION/60}-minute threshold hit for $appName ($pkg)")
         
         serviceScope.launch {
+            if (!ConsentManager.hasConsented(applicationContext)) return@launch
+
             ApiClient.init(applicationContext)
             val deviceId = ApiClient.getDeviceId(applicationContext)
             val payload = ContextPayload(
@@ -198,22 +229,17 @@ class TaskForegroundService : Service() {
             val dao = db.contextPayloadDao()
             val payloadId = dao.insert(payload)
             
-            try {
-                val response = ApiClient.service.sendContext(payload)
-                if (response.notify) {
-                    showThresholdNotification(appName)
-                }
-                dao.update(payload.copy(id = payloadId, syncStatus = SyncStatus.SYNCED))
-                startRewardMonitoring(
-                    targetPackage = pkg,
+            contextResponseHandler.register(
+                ContextResponseHandler.PendingContext(
                     contextId = payloadId,
                     taskId = currentTaskId,
+                    targetPackage = pkg,
+                    appName = appName,
                     deviceId = deviceId
                 )
-            } catch (e: Exception) {
-                Log.e("TaskForegroundService", "Failed to send context", e)
-                dao.update(payload.copy(id = payloadId, syncStatus = SyncStatus.FAILED))
-            }
+            )
+            val requestId = RequestSyncManager.enqueueContext(applicationContext, payload.copy(id = payloadId))
+            if (requestId < 0) contextResponseHandler.unregister(payloadId)
         }
     }
 
@@ -269,19 +295,14 @@ class TaskForegroundService : Service() {
                 timeToClose = timeToCloseSec
             )
 
-            try {
-                ApiClient.service.sendReward(rewardPayload)
-                Log.d("TaskForegroundService", "Reward payload successfully sent: $rewardPayload")
-            } catch (e: Exception) {
-                Log.e("TaskForegroundService", "Failed to send reward payload", e)
-            }
+            RequestSyncManager.enqueueReward(applicationContext, rewardPayload)
         }
     }
 
     private fun showThresholdNotification(appName: String) {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         createAlertChannel()
-        
+
         val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
             .setContentTitle("Threshold Alert")
             .setContentText("1-minute threshold hit for $appName")
@@ -289,7 +310,7 @@ class TaskForegroundService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
-            
+
         notificationManager.notify(ALERT_NOTIFICATION_ID, notification)
     }
 

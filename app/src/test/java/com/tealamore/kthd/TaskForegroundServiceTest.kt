@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +37,7 @@ class TaskForegroundServiceTest {
 
     @Test
     fun testStartCommandWithTaskInfo() {
+        ConsentManager.setConsented(context, true)
         val serviceController = Robolectric.buildService(TaskForegroundService::class.java)
         val service = serviceController.get()
 
@@ -46,6 +48,20 @@ class TaskForegroundServiceTest {
 
         val startResult = service.onStartCommand(intent, 0, 1)
         assertEquals(android.app.Service.START_STICKY, startResult)
+    }
+
+    @Test
+    fun testStartCommandWithoutConsentDoesNotCollectData() {
+        ConsentManager.setConsented(context, false)
+        val service = Robolectric.buildService(TaskForegroundService::class.java).get()
+
+        val intent = Intent(context, TaskForegroundService::class.java).apply {
+            putExtra("extra_task_label", "Coding Feature")
+            putExtra("extra_task_id", 100L)
+        }
+
+        assertEquals(android.app.Service.START_NOT_STICKY, service.onStartCommand(intent, 0, 1))
+        assertTrue(org.robolectric.Shadows.shadowOf(service).isStoppedBySelf)
     }
 
     @Test

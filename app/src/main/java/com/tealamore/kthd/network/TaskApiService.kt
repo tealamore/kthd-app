@@ -9,17 +9,47 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.Header
 import retrofit2.http.POST
 
+/**
+ * Every call carries an `Idempotency-Key` header that stays the same across retries of the same
+ * request, so the backend can recognise and skip duplicates.
+ */
 interface TaskApiService {
     @POST("context")
-    suspend fun sendContext(@Body payload: ContextPayload): ContextResponse
+    suspend fun sendContext(
+        @Body payload: ContextPayload,
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String
+    ): ContextResponse
 
     @POST("consent")
-    suspend fun sendConsent(@Body payload: ConsentPayload): ConsentResponse
+    suspend fun sendConsent(
+        @Body payload: ConsentPayload,
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String
+    ): ConsentResponse
 
     @POST("reward")
-    suspend fun sendReward(@Body payload: RewardPayload): RewardResponse
+    suspend fun sendReward(
+        @Body payload: RewardPayload,
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String
+    ): RewardResponse
+
+    @POST("participant/delete")
+    suspend fun deleteParticipantData(
+        @Body payload: DeleteParticipantPayload,
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String
+    ): DeleteParticipantResponse
+
+    @POST("error")
+    suspend fun reportError(
+        @Body payload: ErrorReportPayload,
+        @Header(IDEMPOTENCY_KEY_HEADER) idempotencyKey: String
+    ): ErrorReportResponse
+
+    companion object {
+        const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+    }
 }
 
 object ApiClient {

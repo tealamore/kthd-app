@@ -6,11 +6,12 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-@Database(entities = [Task::class, ContextPayload::class], version = 4, exportSchema = false)
+@Database(entities = [Task::class, ContextPayload::class, PendingRequest::class], version = 6, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun contextPayloadDao(): ContextPayloadDao
+    abstract fun pendingRequestDao(): PendingRequestDao
 
     companion object {
         @Volatile
